@@ -9,16 +9,20 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.password.CompromisedPasswordChecker;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
+import org.springframework.security.crypto.factory.PasswordEncoderFactories;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.oidc.OidcScopes;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
@@ -26,8 +30,11 @@ import org.springframework.security.oauth2.server.authorization.settings.Authori
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.OAuth2TokenFormat;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
+import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.authentication.password.HaveIBeenPwnedRestApiPasswordChecker;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 
 import java.security.KeyPair;
@@ -37,6 +44,7 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Configuration
@@ -93,19 +101,63 @@ public class ProjectSecurityConfig {
                 .clientSecret("{noop}YvgyjGKJxdj0IiyIhiIiuIiuIuyiIU")
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
-                 /*.authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-                 .redirectUri("http://127.0.0.1:8080/login/oauth2/code/oidc-client")
-                 .postLogoutRedirectUri("http://127.0.0.1:8080/")
-                 .scope(OidcScopes.OPENID)
-                 .scope(OidcScopes.PROFILE)
-                 .clientSettings(ClientSettings.builder().requireAuthorizationConsent(true).build())*/
+                /*.authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                .redirectUri("http://127.0.0.1:8080/login/oauth2/code/oidc-client")
+                .postLogoutRedirectUri("http://127.0.0.1:8080/")
+                .scope(OidcScopes.OPENID)
+                .scope(OidcScopes.PROFILE)
+                .clientSettings(ClientSettings.builder().requireAuthorizationConsent(true).build())*/
                 .scopes(scopeConfig -> scopeConfig.addAll(List.of(OidcScopes.OPENID,
                         "ADMIN",
                         "USER")))
                 .tokenSettings(TokenSettings.builder().accessTokenTimeToLive(Duration.ofMinutes(10))
                         .accessTokenFormat(OAuth2TokenFormat.SELF_CONTAINED).build())
                 .build();
-        return new InMemoryRegisteredClientRepository(clientCredClient);
+
+        RegisteredClient authCodeClient = RegisteredClient.withId(UUID.randomUUID().toString())
+                .clientId("authCodeClient")
+                .clientSecret("{noop}YLmc7GKPz90IiyIhiIiuIiuIQ23iIU")
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                .redirectUri("https://oauth.pstmn.io/v1/callback")
+                /*.postLogoutRedirectUri("http://127.0.0.1:8080/")
+                .scope(OidcScopes.OPENID)
+                .scope(OidcScopes.PROFILE)
+                .clientSettings(ClientSettings.builder().requireAuthorizationConsent(true).build())
+                .scopes(scopeConfig -> scopeConfig.addAll(List.of(OidcScopes.OPENID,
+                        "ADMIN",
+                        "USER")))*/
+                .scope(OidcScopes.OPENID).scope(OidcScopes.EMAIL)
+                .tokenSettings(TokenSettings.builder().accessTokenTimeToLive(Duration.ofMinutes(10))
+                        .refreshTokenTimeToLive(Duration.ofHours(8))
+                        .reuseRefreshTokens(false)
+                        .accessTokenFormat(OAuth2TokenFormat.SELF_CONTAINED).build())
+                .build();
+
+//        RegisteredClient pkceClient = RegisteredClient.withId(UUID.randomUUID().toString())
+//                .clientId("pkcClientCode")
+//                /*.clientSecret("{noop}YLmc7GKPz90IiyIhiIiuIiuIQ23iIU")*/
+//                .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+//                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+//                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+//                .redirectUri("https://oauth.pstmn.io/v1/callback")
+//                /*.postLogoutRedirectUri("http://127.0.0.1:8080/")
+//                .scope(OidcScopes.OPENID)
+//                .scope(OidcScopes.PROFILE)
+//                .clientSettings(ClientSettings.builder().requireAuthorizationConsent(true).build())
+//                .scopes(scopeConfig -> scopeConfig.addAll(List.of(OidcScopes.OPENID,
+//                        "ADMIN",
+//                        "USER")))*/
+//                .scope(OidcScopes.OPENID).scope(OidcScopes.EMAIL)
+//                .clientSettings(ClientSettings.builder().requireProofKey(true).build())
+//                .tokenSettings(TokenSettings.builder().accessTokenTimeToLive(Duration.ofMinutes(10))
+//                        .refreshTokenTimeToLive(Duration.ofHours(8))
+//                        .reuseRefreshTokens(false)
+//                        .accessTokenFormat(OAuth2TokenFormat.SELF_CONTAINED).build())
+//                .build();
+
+        return new InMemoryRegisteredClientRepository(clientCredClient, authCodeClient);
     }
 
     @Bean
@@ -141,5 +193,28 @@ public class ProjectSecurityConfig {
     @Bean
     public AuthorizationServerSettings authorizationServerSettings() {
         return AuthorizationServerSettings.builder().build();
+    }
+
+    @Bean
+    public OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer() {
+        return (context) -> {
+            if (context.getTokenType().equals(OAuth2TokenType.ACCESS_TOKEN)) {
+                context.getClaims().claims((claims) -> {
+                    Set<String> roles = context.getClaims().build().getClaim("scope");
+                    claims.put("roles", roles);
+                    claims.remove("scope");
+                });
+            }
+        };
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+    }
+
+    @Bean
+    public CompromisedPasswordChecker compromisedPasswordChecker() {
+        return new HaveIBeenPwnedRestApiPasswordChecker();
     }
 }
