@@ -1,6 +1,6 @@
 package com.learner.authserver.config;
 
-import com.learner.authserver.model.Customer;
+import com.learner.authserver.model.Customers;
 import com.learner.authserver.repository.CustomerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
@@ -22,7 +22,7 @@ public class BankUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        Customer customer = customerRepositor.findByEmail(username)
+        Customers customer = customerRepositor.findByEmail(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User details not found for the user: " + username));
 
         List<GrantedAuthority> authorities =

@@ -15,6 +15,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
+import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -43,9 +44,8 @@ import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Configuration
 @EnableWebSecurity
@@ -133,31 +133,32 @@ public class ProjectSecurityConfig {
                         .refreshTokenTimeToLive(Duration.ofHours(8))
                         .reuseRefreshTokens(false)
                         .accessTokenFormat(OAuth2TokenFormat.SELF_CONTAINED).build())
+                .clientSettings(ClientSettings.builder().requireProofKey(false).build())
                 .build();
 
-//        RegisteredClient pkceClient = RegisteredClient.withId(UUID.randomUUID().toString())
-//                .clientId("pkcClientCode")
-//                /*.clientSecret("{noop}YLmc7GKPz90IiyIhiIiuIiuIQ23iIU")*/
-//                .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
-//                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-//                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-//                .redirectUri("https://oauth.pstmn.io/v1/callback")
-//                /*.postLogoutRedirectUri("http://127.0.0.1:8080/")
-//                .scope(OidcScopes.OPENID)
-//                .scope(OidcScopes.PROFILE)
-//                .clientSettings(ClientSettings.builder().requireAuthorizationConsent(true).build())
-//                .scopes(scopeConfig -> scopeConfig.addAll(List.of(OidcScopes.OPENID,
-//                        "ADMIN",
-//                        "USER")))*/
-//                .scope(OidcScopes.OPENID).scope(OidcScopes.EMAIL)
-//                .clientSettings(ClientSettings.builder().requireProofKey(true).build())
-//                .tokenSettings(TokenSettings.builder().accessTokenTimeToLive(Duration.ofMinutes(10))
-//                        .refreshTokenTimeToLive(Duration.ofHours(8))
-//                        .reuseRefreshTokens(false)
-//                        .accessTokenFormat(OAuth2TokenFormat.SELF_CONTAINED).build())
-//                .build();
+        RegisteredClient pkceClient = RegisteredClient.withId(UUID.randomUUID().toString())
+                .clientId("pkcClientCode")
+                /*.clientSecret("{noop}YLmc7GKPz90IiyIhiIiuIiuIQ23iIU")*/
+                .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                .redirectUri("https://oauth.pstmn.io/v1/callback")
+                /*.postLogoutRedirectUri("http://127.0.0.1:8080/")
+                .scope(OidcScopes.OPENID)
+                .scope(OidcScopes.PROFILE)
+                .clientSettings(ClientSettings.builder().requireAuthorizationConsent(true).build())
+                .scopes(scopeConfig -> scopeConfig.addAll(List.of(OidcScopes.OPENID,
+                        "ADMIN",
+                        "USER")))*/
+                .scope(OidcScopes.OPENID).scope(OidcScopes.EMAIL)
+                .clientSettings(ClientSettings.builder().requireProofKey(true).build())
+                .tokenSettings(TokenSettings.builder().accessTokenTimeToLive(Duration.ofMinutes(10))
+                        .refreshTokenTimeToLive(Duration.ofHours(8))
+                        .reuseRefreshTokens(false)
+                        .accessTokenFormat(OAuth2TokenFormat.SELF_CONTAINED).build())
+                .build();
 
-        return new InMemoryRegisteredClientRepository(clientCredClient, authCodeClient);
+        return new InMemoryRegisteredClientRepository(clientCredClient, authCodeClient,pkceClient);
     }
 
     @Bean
@@ -200,9 +201,16 @@ public class ProjectSecurityConfig {
         return (context) -> {
             if (context.getTokenType().equals(OAuth2TokenType.ACCESS_TOKEN)) {
                 context.getClaims().claims((claims) -> {
-                    Set<String> roles = context.getClaims().build().getClaim("scope");
-                    claims.put("roles", roles);
-                    claims.remove("scope");
+                    if (context.getAuthorizationGrantType().equals(AuthorizationGrantType.CLIENT_CREDENTIALS)) {
+                        Set<String> roles = context.getClaims().build().getClaim("scope");
+                        claims.put("roles", roles);
+                    } else if (context.getAuthorizationGrantType().equals(AuthorizationGrantType.AUTHORIZATION_CODE)) {
+                        Set<String> roles = AuthorityUtils.authorityListToSet(context.getPrincipal().getAuthorities())
+                                .stream()
+                                .map(c -> c.replaceFirst("^ROLE_", ""))
+                                .collect(Collectors.collectingAndThen(Collectors.toSet(), Collections::unmodifiableSet));
+                        claims.put("roles", roles);
+                    }
                 });
             }
         };
