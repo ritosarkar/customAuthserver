@@ -114,10 +114,26 @@ public class ProjectSecurityConfig {
                         .accessTokenFormat(OAuth2TokenFormat.SELF_CONTAINED).build())
                 .build();
 
+//        RegisteredClient introSpectClient = RegisteredClient.withId(UUID.randomUUID().toString())
+//                .clientId("authServerIntroSpectClient")
+//                .clientSecret("{noop}YkiMGKJxd0IiyIhiIiuIiuIuyI8U")
+//                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+//                .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+//                .scopes(scopeConfig -> scopeConfig.addAll(List.of(OidcScopes.OPENID,
+//                        "ADMIN",
+//                        "USER")))
+//                .tokenSettings(TokenSettings.builder().accessTokenTimeToLive(Duration.ofMinutes(10))
+//                        .accessTokenFormat(OAuth2TokenFormat.REFERENCE).build())
+//                .build();
+
         RegisteredClient authCodeClient = RegisteredClient.withId(UUID.randomUUID().toString())
                 .clientId("authCodeClient")
                 .clientSecret("{noop}YLmc7GKPz90IiyIhiIiuIiuIQ23iIU")
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
+                /*For refresh token post man will going to send the request in HTTP basic format hence
+                allowing BASIC format as well.
+                */
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                 .redirectUri("https://oauth.pstmn.io/v1/callback")
@@ -140,6 +156,7 @@ public class ProjectSecurityConfig {
                 .clientId("pkcClientCode")
                 /*.clientSecret("{noop}YLmc7GKPz90IiyIhiIiuIiuIQ23iIU")*/
                 .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                 .redirectUri("https://oauth.pstmn.io/v1/callback")
@@ -158,7 +175,7 @@ public class ProjectSecurityConfig {
                         .accessTokenFormat(OAuth2TokenFormat.SELF_CONTAINED).build())
                 .build();
 
-        return new InMemoryRegisteredClientRepository(clientCredClient, authCodeClient,pkceClient);
+        return new InMemoryRegisteredClientRepository(clientCredClient, authCodeClient, pkceClient);
     }
 
     @Bean
